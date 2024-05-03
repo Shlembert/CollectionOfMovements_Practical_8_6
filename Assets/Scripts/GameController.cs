@@ -86,7 +86,7 @@ public class GameController : MonoBehaviour
         }
         else
         {
-            // ≈сли текущий бегун достиг точки точки из своего списка
+            // ≈сли текущий бегун достиг точки из своего списка
             // ѕереключаем анимацию текущего бегуна на остановку
             runners[currentRunnerIndex].MoveAnimation(false);
 
