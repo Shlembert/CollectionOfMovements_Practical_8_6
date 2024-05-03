@@ -4,7 +4,7 @@ using UnityEngine;
 public enum MovementType
 {
     Idle,
-    SoloSprin,
+    SoloSprint,
     SoloShuttle,
     MedleyRelay
 }
@@ -18,9 +18,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private float speed, offset;
 
     private List<RunnerController> runners;
-    private int _currentPoint = 0;
     private int currentRunnerIndex = 0;
-    private bool _isMovingForward;
 
     private void Start()
     {
@@ -31,9 +29,8 @@ public class GameController : MonoBehaviour
     {
         moveType = (MovementType)type;
 
-        _currentPoint = 0;
-
         for (int i = 0; i < runners.Count; i++) Destroy(runners[i].gameObject);
+
         runners.Clear();
 
         if (type > 2) SpawnRunner(4);
@@ -42,115 +39,63 @@ public class GameController : MonoBehaviour
 
     private void Update()
     {
-        if (moveType == MovementType.SoloSprin) SoloSprin();
-        else if (moveType == MovementType.SoloShuttle) SoloShuttle();
+        if (moveType == MovementType.SoloSprint) runners[0].SoloSprint(speed, offset);
+        else if (moveType == MovementType.SoloShuttle) runners[0].SoloShuttle(speed, offset);
         else if (moveType == MovementType.MedleyRelay) MedleyRelay();
         else return;
     }
 
-    private Material SetRandomColor()
+    private Material SetRandomColor(List<Material> currentMaterials)
     {
-        int random = Random.Range(0, materials.Count);
-        return materials[random];
+        int random = Random.Range(0, currentMaterials.Count);
+        Material material = currentMaterials[random];
+        currentMaterials.Remove(material);
+        return material;
     }
 
     private void SpawnRunner(int count)
     {
+        List<Material> currentMaterials = new List<Material>();
+
+        for (int i = 0; i < materials.Count; i++)
+        {
+            currentMaterials.Add(materials[i]);
+        }
+
         for (int i = 0; i < count; i++)
         {
             GameObject go = Instantiate(runner.gameObject, points[i].position, Quaternion.identity);
             go.transform.SetParent(transform);
-            runners.Add(go.GetComponent<RunnerController>());
-            runners[i].SetColor(SetRandomColor());
+            RunnerController runnerController = go.GetComponent<RunnerController>();
+            runnerController.SetPoints(points); // ѕередаем список точек бегуну
+            runnerController.CurrentPointIndex = i;
+            runners.Add(runnerController);
+            runners[i].SetColor(SetRandomColor(currentMaterials));
             runners[i].MoveAnimation(false);
-        }
-    }
-
-    private void SoloSprin()
-    {
-        if (_currentPoint >= points.Count)
-        {
-            _currentPoint = 0;
-        }
-
-        if (Vector3.Distance(runners[0].transform.position, points[_currentPoint].position) > offset)
-        {
-            // ¬ычисл€ем направление к следующей точке
-            Vector3 direction = (points[_currentPoint].position - runners[0].transform.position).normalized;
-            // ѕоворачиваем объект, чтобы он смотрел в сторону следующей точки
-            runners[0].transform.LookAt(points[_currentPoint]);
-            // ƒвигаем объект в направлении следующей точки с учетом скорости
-            runners[0].transform.position += direction * speed * Time.deltaTime;
-            runners[0].MoveAnimation(true);
-        }
-        else
-        {
-            // ≈сли достигли текущей точки, переходим к следующей
-            _currentPoint++;
-        }
-    }
-
-    private void SoloShuttle()
-    {
-        if (Vector3.Distance(runners[0].transform.position, points[_currentPoint].position) > offset)
-        {
-            // ¬ычисл€ем направление к следующей точке
-            Vector3 direction = (points[_currentPoint].position - runners[0].transform.position).normalized;
-            // ѕоворачиваем объект, чтобы он смотрел в сторону следующей точки
-            runners[0].transform.LookAt(points[_currentPoint]);
-            // ƒвигаем объект в направлении следующей точки с учетом скорости
-            runners[0].transform.position += direction * speed * Time.deltaTime;
-            runners[0].MoveAnimation(true);
-        }
-        else
-        {
-            // ≈сли достигли последней точки, мен€ем направление движени€ на обратное
-            if (_currentPoint == points.Count - 1)
-            {
-                _isMovingForward = false;
-            }
-            // ≈сли достигли первой точки, мен€ем направление движени€ на пр€мое
-            else if (_currentPoint == 0)
-            {
-                _isMovingForward = true;
-            }
-
-            // ”величиваем или уменьшаем текущий индекс в зависимости от направлени€ движени€
-            _currentPoint += _isMovingForward ? 1 : -1;
         }
     }
 
     private void MedleyRelay()
     {
-        // ѕровер€ем, достиг ли текущий бегун точки следующего бегуна
-        if (Vector3.Distance(runners[currentRunnerIndex].transform.position, points[(currentRunnerIndex + 1) % points.Count].position) > offset)
+        // ѕровер€ем, достиг ли текущий бегун следующей точки из своего списка
+        if (Vector3.Distance(runners[currentRunnerIndex].transform.position, 
+            points[runners[currentRunnerIndex].CurrentPointIndex % points.Count].position) > offset)
         {
             // ≈сли нет, двигаем текущего бегуна к этой точке
-            MoveRunner(currentRunnerIndex, (currentRunnerIndex + 1) % points.Count);
+            runners[currentRunnerIndex].SoloSprint(speed,offset);
         }
         else
         {
-            // ≈сли текущий бегун достиг точки следующего бегуна
+            // ≈сли текущий бегун достиг точки точки из своего списка
             // ѕереключаем анимацию текущего бегуна на остановку
             runners[currentRunnerIndex].MoveAnimation(false);
 
             // ѕереходим к следующему бегуну в списке
-            currentRunnerIndex = (currentRunnerIndex + 1) % points.Count;
+            currentRunnerIndex = (currentRunnerIndex + 1) % runners.Count;
 
             // «апускаем движение текущего бегуна к следующей точке
-            MoveRunner(currentRunnerIndex, (currentRunnerIndex + 1) % points.Count);
+            runners[currentRunnerIndex].SoloSprint(speed, offset);
         }
-    }
-
-    private void MoveRunner(int current, int next)
-    {
-        // ¬ычисл€ем направление к следующей точке
-        Vector3 direction = (points[next].position - runners[current].transform.position).normalized;
-        // ѕоворачиваем объект, чтобы он смотрел в сторону следующей точки
-        runners[current].transform.LookAt(points[next]);
-        // ƒвигаем объект в направлении следующей точки с учетом скорости
-        runners[current].transform.position += direction * speed * Time.deltaTime;
-        runners[current].MoveAnimation(true);
     }
 }
 
